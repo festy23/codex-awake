@@ -12,7 +12,7 @@
 
 ## Ресурсы
 
-- [Состояние регистрации](../jetstream/state.md).
+- [Состояние регистрации](../database/state.md).
 - [Привязка процесса](../../process-watch/operations/attach-process.md).
 
 ## Входные параметры

@@ -1,6 +1,8 @@
 # codex-awake
 
-Локальная утилита на Rust с NATS JetStream для продолжения работы Codex Desktop по событию.
+Локальная утилита на Rust со встроенной очередью effectum на SQLite для продолжения работы Codex Desktop по событию.
+
+**Выбранный стек: Rust backend + effectum + файловая SQLite.** Решение от 2026-10-27 заменяет NATS JetStream. Очередь работает внутри нашей программы; отдельный процесс брокера и сервер PostgreSQL не требуются.
 
 Первый сценарий: зарегистрировать уже запущенный локальный процесс, дождаться его завершения без вызовов модели и доставить этот факт в исходный чат. Codex проверяет результат по заранее заданной инструкции. Утилита не запускает наблюдаемую команду и не обещает получить её exit code, stdout или stderr.
 
@@ -9,4 +11,4 @@
 - [Спецификации модулей](docs/modules/index.md)
 - [Правила работы агента](AGENTS.md)
 
-Документация модулей оформляется по [writing-spec из essay-platform](https://github.com/photorus/essay-platform/blob/9dc96179ab36d36eb05a45e16d120f625402c42a/.agents/skills/writing-spec/SKILL.md), с описанием JetStream вместо PostgreSQL. Незавершённые части перечислены в индексе модулей.
+Документация модулей оформляется по [writing-spec из essay-platform](https://github.com/photorus/essay-platform/blob/9dc96179ab36d36eb05a45e16d120f625402c42a/.agents/skills/writing-spec/SKILL.md), с отдельными контрактами очереди effectum и хранения SQLite. Незавершённые части перечислены в индексе модулей.

@@ -12,10 +12,11 @@ Backend владеет связью между ожиданием, наблюд�
 - [Отмена ожидания](operations/cancel-watch.md).
 - [Доставка события](jobs/deliver-event.md).
 - [Восстановление состояния](jobs/recover-state.md).
-- [Ресурсы JetStream](jetstream/README.md).
+- [Очередь effectum](queue/README.md).
+- [Хранение SQLite](database/README.md).
 - [Настройки](settings.md).
 - [Кэши](caches.md).
 
 ## Зависимости
 
-Использовать NATS JetStream, [process-watch](../process-watch/README.md) и [codex-delivery](../codex-delivery/README.md). Не записывать напрямую во внутреннюю базу Desktop.
+Использовать effectum с файловой SQLite, [process-watch](../process-watch/README.md) и [codex-delivery](../codex-delivery/README.md). Не записывать напрямую во внутреннюю базу Desktop.

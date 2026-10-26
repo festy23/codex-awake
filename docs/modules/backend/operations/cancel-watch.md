@@ -12,7 +12,7 @@
 
 ## Ресурсы
 
-- [Регистрация и доставка](../jetstream/state.md).
+- [Регистрация и доставка](../database/state.md).
 - Подписка [process-watch](../../process-watch/README.md).
 
 ## Входные параметры
