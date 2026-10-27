@@ -15,7 +15,7 @@ pub enum Action {
     },
 }
 
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum Outcome {
     Checked {
@@ -37,6 +37,8 @@ pub enum Outcome {
     },
 }
 
+// The probe keeps the protocol sequence together so the no-retry boundary is visible.
+#[allow(clippy::too_many_lines, clippy::indexing_slicing)]
 pub async fn run(socket: &Path, thread_id: &str, action: Action, deadline: Duration) -> Outcome {
     if !socket.is_absolute() || thread_id.trim().is_empty() || deadline.is_zero() {
         return not_sent("invalid_arguments");
@@ -60,9 +62,8 @@ pub async fn run(socket: &Path, thread_id: &str, action: Action, deadline: Durat
         Ok::<_, ()>(ws)
     })
     .await;
-    let ws = match connection {
-        Ok(Ok(ws)) => ws,
-        _ => return not_sent("connection_failed_or_timed_out"),
+    let Ok(Ok(ws)) = connection else {
+        return not_sent("connection_failed_or_timed_out");
     };
     let mut client = Client {
         ws,
@@ -160,13 +161,17 @@ pub async fn run(socket: &Path, thread_id: &str, action: Action, deadline: Durat
         .and_then(Value::as_str)
         .filter(|id| !id.trim().is_empty());
     let input = submission.get("input").and_then(Value::as_array);
+    let Some(id) = id else {
+        return Outcome::DeliveryUnknown {
+            reason: "invalid_or_mismatched_receipt".into(),
+        };
+    };
     if submission["clientUserMessageId"].as_str() != Some(&client_message_id)
         || !input.is_some_and(|items| {
             items.len() == 1
                 && items[0]["type"] == "text"
                 && items[0]["text"].as_str() == Some(&message)
         })
-        || id.is_none()
     {
         return Outcome::DeliveryUnknown {
             reason: "invalid_or_mismatched_receipt".into(),
@@ -174,7 +179,7 @@ pub async fn run(socket: &Path, thread_id: &str, action: Action, deadline: Durat
     }
     Outcome::Accepted {
         thread_id: thread_id.into(),
-        queued_submission_id: id.unwrap().into(),
+        queued_submission_id: id.into(),
         client_message_id,
     }
 }
@@ -206,6 +211,8 @@ struct Client {
 }
 
 impl Client {
+    // The timeout wraps the complete send/read exchange; JSON Value indexing preserves null-on-missing semantics.
+    #[allow(clippy::excessive_nesting, clippy::indexing_slicing)]
     async fn rpc(&mut self, method: &str, params: Value) -> Result<Value, Failure> {
         let id = self.next_id;
         self.next_id += 1;
@@ -246,10 +253,9 @@ impl Client {
                     return Err(Failure::Protocol("invalid_rpc_response"));
                 }
                 if let Some(error) = response.get("error") {
-                    return match error["code"].as_i64() {
-                        Some(code) => Err(Failure::Rpc(code)),
-                        None => Err(Failure::Protocol("invalid_rpc_error")),
-                    };
+                    return Err(error["code"]
+                        .as_i64()
+                        .map_or(Failure::Protocol("invalid_rpc_error"), Failure::Rpc));
                 }
                 return response
                     .get("result")

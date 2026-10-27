@@ -1,4 +1,15 @@
 #![cfg(unix)]
+// Test assertions deliberately abort on invalid fixtures, and the mock mirrors the protocol exchange.
+#![allow(
+    clippy::excessive_nesting,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::too_many_lines,
+    clippy::unwrap_used,
+    clippy::unused_async,
+    clippy::unused_async_trait_impl
+)]
 
 use codex_awake_queue_probe::{Action, Outcome, run};
 use futures_util::{SinkExt, StreamExt};

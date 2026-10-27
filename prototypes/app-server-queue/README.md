@@ -4,6 +4,18 @@
 
 Это проверка канала доставки. Production backend, effectum и наблюдение за процессами в прототип не входят. Его параметры и классификация результатов не закрепляют незавершённые production-контракты S1–S5 из [индекса](../../docs/modules/index.md).
 
+## Проверки кода
+
+Корневой `rust-toolchain.toml` закрепляет Rust 1.99.1 и компоненты Clippy и rustfmt. CI запускает проверки на macOS для всех целей и features прототипа. Те же команды можно выполнить локально из корня репозитория:
+
+```sh
+cargo fmt --manifest-path prototypes/app-server-queue/Cargo.toml --all -- --check
+cargo clippy --manifest-path prototypes/app-server-queue/Cargo.toml --locked --all-targets --all-features -- -D warnings
+cargo test --manifest-path prototypes/app-server-queue/Cargo.toml --locked --all-targets --all-features
+```
+
+Clippy проверяет стандартные, `pedantic` и `nursery` правила, а также отдельные ограничения на потенциальные паники и сложность. Это эвристики: они не доказывают соблюдение SOLID и могут требовать обоснованных локальных исключений.
+
 ## Мок-проверка
 
 Из корня репозитория, с установленным Rust toolchain:

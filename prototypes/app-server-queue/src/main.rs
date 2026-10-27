@@ -65,6 +65,8 @@ fn options() -> Result<(PathBuf, String, Action, Duration), String> {
 }
 
 #[tokio::main(flavor = "current_thread")]
+// Outcome consists only of serializable strings and integers.
+#[allow(clippy::expect_used)]
 async fn main() -> ExitCode {
     if std::env::args().any(|arg| arg == "--help") {
         println!("{HELP}");
