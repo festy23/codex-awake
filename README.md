@@ -8,10 +8,11 @@
 
 **Выбранный метод доставки: прямой App Server RPC `thread/queue/add`.** Клиент должен обращаться к серверу исходного чата Desktop. Дополнительный App Server для записи в общую очередь не используется.
 
-**Статус: спецификации в разработке, production-реализация отсутствует.** Общий endpoint установленного Desktop ещё не подтверждён. Начальная платформа — macOS.
+**Статус: спецификации в разработке, production-реализация отсутствует.** 28 октября 2026 года живой тест на macOS подтвердил доставку через локальный TCP WebSocket в общий App Server Desktop и пробуждение неактивного чата. WebSocket-клиент находится в [draft PR #4](https://github.com/festy23/codex-awake/pull/4); установка и восстановление ещё не определены. Начальная платформа — macOS.
 
 - [Спецификации модулей](docs/modules/index.md)
 - [Правила работы агента](AGENTS.md)
+- [Handoff для следующего агента](HANDOFF.md)
 - [Диагностический Rust-прототип прямого `thread/queue/add`](prototypes/app-server-queue/README.md)
 
 Документация модулей оформляется по [writing-spec из essay-platform](https://github.com/photorus/essay-platform/blob/9dc96179ab36d36eb05a45e16d120f625402c42a/.agents/skills/writing-spec/SKILL.md), с отдельными контрактами очереди effectum и хранения SQLite. Незавершённые части перечислены в индексе модулей.
