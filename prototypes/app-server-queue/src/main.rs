@@ -1,9 +1,9 @@
-use codex_awake_queue_probe::{Action, Outcome, run};
+use codex_awake_queue_probe::{Action, Endpoint, Outcome, run_endpoint};
 use std::{collections::HashMap, path::PathBuf, process::ExitCode, time::Duration};
 
-const HELP: &str = "Usage: codex-awake-queue-probe --socket ABSOLUTE_PATH --thread ID --timeout-ms N\n  --check-only\n  OR --client-message-id ID --message-file PATH\nConnects to an existing App Server; never starts Codex or retries delivery.";
+const HELP: &str = "Usage: codex-awake-queue-probe (--socket ABSOLUTE_PATH | --websocket-url ws://LOOPBACK_IP:PORT/rpc)\n  --thread ID --timeout-ms N\n  --check-only\n  OR --client-message-id ID --message-file PATH\nConnects to an existing App Server; never starts Codex or retries delivery.";
 
-fn options() -> Result<(PathBuf, String, Action, Duration), String> {
+fn options() -> Result<(Endpoint, String, Action, Duration), String> {
     let mut args = std::env::args().skip(1);
     let mut values = HashMap::new();
     let mut check = false;
@@ -17,6 +17,7 @@ fn options() -> Result<(PathBuf, String, Action, Duration), String> {
         }
         if ![
             "--socket",
+            "--websocket-url",
             "--thread",
             "--timeout-ms",
             "--client-message-id",
@@ -34,8 +35,12 @@ fn options() -> Result<(PathBuf, String, Action, Duration), String> {
             return Err("duplicate option".into());
         }
     }
+    let endpoint = match (values.remove("--socket"), values.remove("--websocket-url")) {
+        (Some(path), None) => Endpoint::Unix(PathBuf::from(path)),
+        (None, Some(url)) => Endpoint::LoopbackWebSocket(url),
+        _ => return Err("choose exactly one of --socket and --websocket-url".into()),
+    };
     let mut required = |key: &str| values.remove(key).ok_or_else(|| format!("required: {key}"));
-    let socket = PathBuf::from(required("--socket")?);
     let thread = required("--thread")?;
     let milliseconds = required("--timeout-ms")?
         .parse::<u64>()
@@ -61,7 +66,12 @@ fn options() -> Result<(PathBuf, String, Action, Duration), String> {
             message,
         }
     };
-    Ok((socket, thread, action, Duration::from_millis(milliseconds)))
+    Ok((
+        endpoint,
+        thread,
+        action,
+        Duration::from_millis(milliseconds),
+    ))
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -73,7 +83,9 @@ async fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     let outcome = match options() {
-        Ok((socket, thread, action, deadline)) => run(&socket, &thread, action, deadline).await,
+        Ok((endpoint, thread, action, deadline)) => {
+            run_endpoint(&endpoint, &thread, action, deadline).await
+        }
         Err(reason) => Outcome::NotSent { reason },
     };
     println!(

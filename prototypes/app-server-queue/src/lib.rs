@@ -3,9 +3,23 @@
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::{collections::HashSet, path::Path, time::Duration};
-use tokio::{net::UnixStream, time::timeout};
+use std::{
+    collections::HashSet,
+    net::{IpAddr, SocketAddr},
+    path::{Path, PathBuf},
+    time::Duration,
+};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::{TcpStream, UnixStream},
+    time::timeout,
+};
 use tokio_tungstenite::{WebSocketStream, client_async, tungstenite::Message};
+
+pub enum Endpoint {
+    Unix(PathBuf),
+    LoopbackWebSocket(String),
+}
 
 pub enum Action {
     Check,
@@ -40,8 +54,32 @@ pub enum Outcome {
 // The probe keeps the protocol sequence together so the no-retry boundary is visible.
 #[allow(clippy::too_many_lines, clippy::indexing_slicing)]
 pub async fn run(socket: &Path, thread_id: &str, action: Action, deadline: Duration) -> Outcome {
-    if !socket.is_absolute() || thread_id.trim().is_empty() || deadline.is_zero() {
+    run_endpoint(
+        &Endpoint::Unix(socket.to_path_buf()),
+        thread_id,
+        action,
+        deadline,
+    )
+    .await
+}
+
+// Keep both transports on the same protocol path and no-retry boundary.
+#[allow(clippy::too_many_lines, clippy::indexing_slicing)]
+pub async fn run_endpoint(
+    endpoint: &Endpoint,
+    thread_id: &str,
+    action: Action,
+    deadline: Duration,
+) -> Outcome {
+    if thread_id.trim().is_empty() || deadline.is_zero() {
         return not_sent("invalid_arguments");
+    }
+    match endpoint {
+        Endpoint::Unix(path) if !path.is_absolute() => return not_sent("invalid_arguments"),
+        Endpoint::LoopbackWebSocket(url) if websocket_address(url).is_none() => {
+            return not_sent("invalid_websocket_endpoint");
+        }
+        _ => {}
     }
     if let Action::Enqueue {
         client_message_id,
@@ -55,10 +93,20 @@ pub async fn run(socket: &Path, thread_id: &str, action: Action, deadline: Durat
     // Connect only to the endpoint supplied by the caller. No process spawning,
     // endpoint discovery, thread resume, or fallback to Desktop's internal IPC.
     let connection = timeout(deadline, async {
-        let stream = UnixStream::connect(socket).await.map_err(|_| ())?;
-        let (ws, _) = client_async("ws://localhost/rpc", stream)
-            .await
-            .map_err(|_| ())?;
+        let (stream, request): (Box<dyn ProbeStream>, &str) = match endpoint {
+            Endpoint::Unix(path) => (
+                Box::new(UnixStream::connect(path).await.map_err(|_| ())?),
+                "ws://localhost/rpc",
+            ),
+            Endpoint::LoopbackWebSocket(url) => {
+                let address = websocket_address(url).ok_or(())?;
+                (
+                    Box::new(TcpStream::connect(address).await.map_err(|_| ())?),
+                    url,
+                )
+            }
+        };
+        let (ws, _) = client_async(request, stream).await.map_err(|_| ())?;
         Ok::<_, ()>(ws)
     })
     .await;
@@ -205,9 +253,28 @@ impl Failure {
 }
 
 struct Client {
-    ws: WebSocketStream<UnixStream>,
+    ws: WebSocketStream<Box<dyn ProbeStream>>,
     next_id: u64,
     deadline: Duration,
+}
+
+trait ProbeStream: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> ProbeStream for T {}
+
+fn websocket_address(url: &str) -> Option<SocketAddr> {
+    let uri = url
+        .parse::<tokio_tungstenite::tungstenite::http::Uri>()
+        .ok()?;
+    if uri.scheme_str() != Some("ws") || uri.authority()?.as_str().contains('@') {
+        return None;
+    }
+    let ip = uri
+        .host()?
+        .trim_matches(['[', ']'])
+        .parse::<IpAddr>()
+        .ok()?;
+    let port = uri.port_u16()?;
+    ip.is_loopback().then(|| SocketAddr::new(ip, port))
 }
 
 impl Client {
